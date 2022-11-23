@@ -1,0 +1,181 @@
+####### Create a single document that maps case id to the correct sub-folder that contains each gene count tsv file (with correct file name) #######
+##### All code runs properly #####
+
+### Package Install
+if (!requireNamespace('BiocManager', quietly = TRUE))
+  install.packages('BiocManager')
+library(BiocManager)
+
+# Install Bioconductor Packages #
+BiocManager::install('DESeq2', force=TRUE)
+BiocManager::install('edgeR')
+BiocManager::install('limma')
+
+
+#install.packages("xlsx")
+
+library(DESeq2)
+library(edgeR)
+library(limma)
+
+library(tidyverse)
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(data.table)
+library(xlsx)
+library(readxl)
+library(plyr)
+
+
+###### Read in data ######
+# replace file path  below to point to location of data on your machine 
+data_path <- "~/Desktop/Classes/2022-2023/Fall 2022/BMI 6030_Bioinformatics/Group Project/TCGA/Data_Lung-Cancer"
+df_folders <- as.data.frame.complex(list.dirs(path = data_path, full.names = TRUE))
+names(df_folders)[1] <- 'path'
+View(df_folders)
+
+
+# test loop over file paths in df_folders dataframe
+for (i in 1:nrow(df_folders)){
+  path <- df_folders[i, ]
+  print(path)
+}
+
+
+##### Create key document mapping gene count tsv file name to folder name and case_id #####
+# create empty dataframe to map tsv file and folder names to case_id 
+#file_key <- setNames(data.frame(matrix(ncol = 2, nrow = 0)), c("tsv_file_name", "folder_name"))
+file_key <- data.frame(matrix(ncol = 2, nrow = 0))
+#View(file_key)
+
+# open each file in each folder, extracting and recording relevant info
+# insert this data as a row in the dataframe created above
+for (i in 1:nrow(df_folders)){
+  item <- df_folders[i, ]
+  #print(item)
+  file_path <- list.files(path = item, pattern=NULL, all.files=FALSE, full.names=TRUE)
+  #print(file_path)
+
+  fp <- str_split(file_path, "/")
+  #print(fp[[1]])
+  
+  tsv <- (fp[[1]][13])
+  folder <- (fp[[1]][12])
+  #print(tsv)
+  #print(folder)
+  row <- c(tsv, folder)
+  print(row)
+  print("------------------------------------------------------------------------------")
+  file_key <- rbind(file_key, row)
+}
+
+#View(file_key)
+
+# remove first row
+file_key <- file_key[-1, ]
+#View(file_key)
+
+# rename columns 
+colnames(file_key)
+names(file_key)[1] <- 'tsv_file_name'
+names(file_key)[2] <- 'folder_name'
+#View(file_key)
+
+# add new column of all 0s to fill in case_id next to each tsv file and folder name
+file_key <- cbind("case_id"= 0, file_key)
+file_key <- cbind(file_key, "created_dt"= 0) 
+View(file_key)
+
+checkpoint <- file_key
+View(checkpoint)
+
+# map case_id from clinical file to correct gene read count file using metadata file (NOTE: metadata is a .json file)
+# from TCGA repository download:
+# > folder name --> "file_id" in metadata document
+# > TSV gene read count file name --> overarching file_name in metadata document
+# > use the file name to look up case_id in metadata document (this is how patients are identified in clinical document)
+
+# FOR EXAMPLE: 
+# > in a folder called ___ the gene read count file is called "3d7bfce7-47cc-431e-bc59-bf54529b7c3c.rna_seq.augmented_star_gene_counts.tsv'
+# > use "3d7bfce7-47cc-431e-bc59-bf54529b7c3c.rna_seq.augmented_star_gene_counts.tsv" to look up the case_id in the metadata document
+# > ("case_id": "192571db-fc43-46e9-9f25-d2db46aadba6")
+# > this is the case_id used in the clinical document
+
+# Install JSON packages (uncomment install lines if packages are not already installed)
+#install.packages('rjson')
+library(rjson)
+#install.packages('jsonlite')
+library(jsonlite)
+
+# paste appropriate path for your machine into JSON_file variable below
+JSON_file = "~/Desktop/Classes/2022-2023/Fall 2022/BMI 6030_Bioinformatics/Group Project/TCGA/Code_test/Metadata_Lung-Cancer/metadata.cart.2022-11-18.json"
+raw_metadata <- fromJSON(paste(readLines(JSON_file), collapse=""))
+View(raw_metadata)
+raw_metadata$file_name # tsv files
+raw_metadata$file_id # folder name
+raw_metadata$analysis$created_datetime# file created date
+
+### NOTE: THIS FOR LOOP ITERATES THROUGH TWO DATA OBJECTS--IT WILL TAKE SEVERAL MINUTES TO RUN COMPLETELY ### 
+# use tsv file name and folder name to locate case_id in metadata
+for (i in 1:nrow(file_key)){
+  item <- file_key[i, ]
+  file_key_name <- as.character(item['tsv_file_name'])
+  print('tsv file name: ')
+  print(file_key_name)
+  file_key_folder_name <- as.character(item['folder_name'])
+  #print(class(file_key_name))
+  
+  # iterate through JSON metadata file to locate file name
+  for(j in 1:nrow(raw_metadata)){
+    item2 <- raw_metadata[j, ]
+    #print(item2$file_name)
+    metadata_iter_name <- as.character(item2['file_name'])
+    
+    #print("file name from metadata: ")
+    #print(metadata_iter_name)
+    #print(paste("created at: ", created_date))
+    
+    # compare each file name in the metadata JSON object to the file name from the file_key dataframe
+    # if the two names match, parse through the layers of the JSON object to extract the correct case_id
+    if (metadata_iter_name == file_key_name){
+      print("        *************match found at location**************            ")
+      print(paste("                      ", j, "                                   "))
+      #print(metadata_iter_name)
+
+      associated_entities <- as.vector(item2['associated_entities'])
+      contents <- associated_entities[[1]][1]
+      inside_contents <- contents[[1]]
+      case_ID <- as.character(inside_contents['case_id'])
+      print("the patient case_id for this file is: ")
+      print(case_ID)
+      
+      analysis <- as.vector(item2['analysis'])
+      contents <- analysis[[1]]
+      created_date <- contents[11]
+      print(created_date)
+      
+      # insert case_id into file_key dataframe where the column 'tsv_file_name' matches the correct value
+      file_key['case_id'][file_key['tsv_file_name'] == metadata_iter_name] <- case_ID
+      file_key['created_dt'][file_key['tsv_file_name'] == metadata_iter_name] <- created_date
+    }  
+  }
+  
+  print('-------------------------------------------------------------------')
+}
+
+View(file_key)
+class(file_key)
+
+
+
+### Write file_key to csv ###
+# replace file path with desired location on your machine # 
+file_key <- apply(file_key,2,as.character)
+write_to <- '~/Desktop/Classes/2022-2023/Fall 2022/BMI 6030_Bioinformatics/Group Project/TCGA/Code_test/'
+write.csv(file_key, paste(write_to, "file_key.csv"), row.names=FALSE)
+
+
+#### reset file_key if necessary #####
+file_key <- checkpoint
+View(file_key)
