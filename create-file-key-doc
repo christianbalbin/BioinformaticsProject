@@ -30,7 +30,7 @@ library(plyr)
 
 ###### Read in data ######
 # replace file path  below to point to location of data on your machine 
-data_path <- "~/Desktop/Classes/2022-2023/Fall 2022/BMI 6030_Bioinformatics/Group Project/TCGA/Data_Lung-Cancer"
+data_path <- "FILE PATH HERE"
 df_folders <- as.data.frame.complex(list.dirs(path = data_path, full.names = TRUE))
 names(df_folders)[1] <- 'path'
 View(df_folders)
@@ -110,7 +110,7 @@ library(rjson)
 library(jsonlite)
 
 # paste appropriate path for your machine into JSON_file variable below
-JSON_file = "~/Desktop/Classes/2022-2023/Fall 2022/BMI 6030_Bioinformatics/Group Project/TCGA/Code_test/Metadata_Lung-Cancer/metadata.cart.2022-11-18.json"
+JSON_file = "FILE PATH HERE .json"
 raw_metadata <- fromJSON(paste(readLines(JSON_file), collapse=""))
 View(raw_metadata)
 raw_metadata$file_name # tsv files
@@ -180,11 +180,11 @@ dim(file_key_2)
 ### Write file_key to csv ###
 # replace file path with desired location on your machine # 
 file_key<- apply(file_key_2,2,as.character)
-write_to <- '~/Desktop/Classes/2022-2023/Fall 2022/BMI 6030_Bioinformatics/Group Project/TCGA/Code_test/'
+write_to <- 'FILE PATH HERE'
 write.csv(file_key, paste(write_to, "file_key.csv"), row.names=TRUE)
 
 file_key_2 <- apply(file_key_2,2,as.character)
-write_to <- '~/Desktop/Classes/2022-2023/Fall 2022/BMI 6030_Bioinformatics/Group Project/TCGA/Code_test/'
+write_to <- 'FILE PATH HERE'
 write.csv(file_key, paste(write_to, "file_key2.csv"), row.names=TRUE)
 
 
