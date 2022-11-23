@@ -1,5 +1,4 @@
 ####### Create a single document that maps case id to the correct sub-folder that contains each gene count tsv file (with correct file name) #######
-##### All code runs properly #####
 
 ### Package Install
 if (!requireNamespace('BiocManager', quietly = TRUE))
