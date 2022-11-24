@@ -1,0 +1,220 @@
+####### Create a single document that contains all unstranded gene read counts as columns and genes as rows #######
+####### Create a single document that contains all info on each gene (gene id, ENSEMBL id, gene symbol & type) #######
+### NOTE: create_file_key must be run first as this script uses the output of that one ###
+
+### Package Install
+if (!requireNamespace('BiocManager', quietly = TRUE))
+  install.packages('BiocManager')
+library(BiocManager)
+
+# Install Bioconductor Packages #
+#BiocManager::install('DESeq2', force=TRUE)
+#BiocManager::install('edgeR')
+#BiocManager::install('limma')
+
+
+#install.packages("xlsx")
+
+library(DESeq2)
+library(edgeR)
+library(limma)
+
+library(tidyverse)
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(data.table)
+library(xlsx)
+library(readxl)
+library(plyr)
+
+
+###### Read in data ######
+# replace file path  below to point to location of data on your machine 
+data_path <- "FILE PATH HERE"
+df_folders <- as.data.frame.complex(list.dirs(path = data_path, full.names = TRUE))
+
+names(df_folders)[1] <- 'file_path'
+View(df_folders)
+dim(df_folders)
+
+
+# test loop over file paths in df_folders dataframe
+for (i in 1:nrow(df_folders)){
+  path <- df_folders[i, ]
+  print(path)
+}
+
+
+# create empty lists to populate in below for loop
+tsv_file_names <- list()
+tsv_full_paths <- list()
+
+
+
+for (i in 1:nrow(df_folders)){
+  folder <- df_folders[i, ]
+  tsv_file_name <- list.files(folder, pattern="*.tsv")
+  tsv_file_names[[length(tsv_file_names)+1]] <- tsv_file_name
+  #print(folder)
+  #print(tsv_file_name)
+  full_path <- paste(folder, "/", tsv_file_name, sep="")
+  tsv_full_paths[[length(tsv_full_paths)+1]] <- full_path
+  print(full_path)
+  print("---------------------------------------------------------------------")
+}
+
+tsv_file_names
+length(tsv_file_names)
+
+tsv_full_paths
+length(tsv_full_paths)
+class(tsv_full_paths)
+
+
+
+checkpoint <- tsv_full_paths #############
+
+
+
+
+### Create Gene Key ###
+# read gene count data to extract first three columns to serve as template for appending unstranded counts from each sample as column
+gene_file_path <- ("FILE PATH HERE")
+df_genes <- read.table(gene_file_path, sep = "\t", header=TRUE)
+class(df_genes)
+df_genes
+View(df_genes)
+gene_key <- df_genes[-c(1, 2, 3), c("gene_id", "gene_name", "gene_type")]
+gene_key <- subset(gene_key, gene_id != 'N_ambiguous')
+View(gene_key)
+
+# write gene_key to csv #
+# replace file path with desired location on your machine # 
+gene_key <- apply(gene_key,2,as.character)
+write_to <- 'FILE PATH HERE'
+write.csv(gene_key, paste(write_to, "gene_key.csv"), row.names=TRUE)
+
+
+
+# create copy of gene key (first three columns of each tsv gene count file) to serve as template for aggregate gene_read_count file
+counts_data <- as.data.frame(gene_key)
+View(counts_data)
+
+
+### Loop through all sub-folders within overall TCGA data folder, read the tsv gene counts file, and add to read_counts dataframe ### 
+# allow several minutes for the loop to run completely
+for(i in 1:length(tsv_full_paths)){
+  folder <- df_folders[i, ]
+  tsv_file_name <- list.files(folder, pattern="*.tsv")
+  tsv_file_name <- as.character(tsv_file_name)
+  full_path <- paste(folder, "/", tsv_file_name, sep="")
+  #print(full_path)
+  
+  #print(folder)
+  setwd(folder)
+  cwd <- getwd()
+  print(cwd)
+  #print("                   contains the tsv file: ")
+  #print(list.files(cwd, pattern="*.tsv"))
+  #print(length(tsv_file_name))
+  
+  
+  if(length(tsv_file_name != 0)){
+    if(file.exists(tsv_file_name) == TRUE){
+      print(tsv_file_name)
+      data <- as.data.frame(read.table(tsv_file_name, sep = "\t", header=TRUE))
+      data <- as.data.frame(data[-c(1, 2, 3, 4), ])
+      #print(class(data))
+      #View(data)
+      #print(colnames(data))
+      #print(attributes(data))
+      
+      # collect gene_id column and unstranded read count column from each tsv file
+      # name the unstranded read count column to the name of the tsv to join to read_counts dataframe
+      df_unstranded <- select(data, gene_id, unstranded)
+      names(df_unstranded)[2] <- tsv_file_name
+      #View(df_unstranded)
+      
+      # join sample data to data frame matching the read count by the gene_id to ensure 
+      # correct read count is associated with correct gene
+      counts_data <- merge(counts_data, df_unstranded, by="gene_id")
+      #View(counts_data)
+    }
+    
+  }else if (length(tsv_file_name == 0)){
+    print("file does not exist")
+  }
+  
+  print("---------------------------------------------------------------------")
+
+}
+
+View(counts_data)
+dim(counts_data)
+
+counts_data_2 <- counts_data
+View(counts_data_2)
+
+# write counts_data to csv file #
+# replace file path with desired location on your machine # 
+counts_data_2 <- apply(counts_data_2, 2, as.character)
+write_to <- 'FILE PATH HERE'
+write.csv(counts_data_2, paste(write_to, "unstranded_counts.csv"), row.names=FALSE)
+
+
+
+### Create additional version that uses case_id names as column names instead of tsv file names ###
+# change working directory to location of this file on your machine
+setwd("FILE PATH HERE")
+data_path <- "FILE PATH HERE"
+
+# check file name from output of below line to copy into read.csv
+list.files()
+
+
+# read in file_key.csv from create_file_key_doc.R script
+file_key <- read.csv(" file_key.csv", header = TRUE, row.names = 1)
+View(file_key)
+class(file_key)
+
+
+#View(counts_data_2)
+
+counts_data_ids <- as.data.frame(counts_data_2)
+#View(counts_data_ids)
+
+
+# allow several minutes for this loop to run
+# locate tsv file name in file_key to extract case_id
+# replace the column name in counts_data with the case_id 
+# since this is how patients are identified in the clinical file
+for (col_name in colnames(counts_data_ids)){
+  print(col_name)
+  print(class(col_name))
+  for(j in 1:nrow(file_key)){
+    key <- file_key[j, ]
+    key_iter_name <- as.character(key['tsv_file_name'])
+    #print(key_iter_name)
+    if(key_iter_name == col_name){
+      print(paste("                               match found at location ", j))
+      print(paste("--> ", key_iter_name))
+      case_id <- as.character(key['case_id'])
+      print(paste("the case id for this file is: ", case_id))
+      colnames(counts_data_ids)[which(names(counts_data_ids) == key_iter_name)] <- case_id
+    }
+  }
+  print("---------------------------------------------------------------------")
+}
+
+View(counts_data_ids)
+dim(counts_data_ids)
+
+
+
+# write counts_data to csv file #
+# replace file path with desired location on your machine # 
+counts_data_ids <- apply(counts_data_ids, 2, as.character)
+write_to <- 'FILE PATH HERE'
+write.csv(counts_data_ids, paste(write_to, "unstranded_counts_BY-CASE-ID.csv"), row.names=FALSE)
+
