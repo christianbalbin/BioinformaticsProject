@@ -1,0 +1,67 @@
+####### Create cleaned clinical document and write as .csv #######
+
+
+### Package Install
+if (!requireNamespace('BiocManager', quietly = TRUE))
+  install.packages('BiocManager')
+library(BiocManager)
+
+# Install Bioconductor Packages #
+#BiocManager::install('DESeq2', force=TRUE)
+#BiocManager::install('edgeR')
+#BiocManager::install('limma')
+
+
+#install.packages("xlsx")
+
+library(DESeq2)
+library(edgeR)
+library(limma)
+
+library(tidyverse)
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(data.table)
+library(xlsx)
+library(readxl)
+library(plyr)
+
+
+###### Read in data ######
+file_path <- ("FILE PATH HERE")
+raw_clinical <- read_excel(file_path, col_names=TRUE, na='')
+colnames(raw_clinical)
+View(raw_clinical)
+dim(raw_clinical)
+
+##### Create New Clinical File #####
+# New clinical file will contain ~1/3 of the original columns (those blank for all patients are omitted) #
+clinical<- raw_clinical
+View(clinical)
+
+keep <- c("case_id", "case_submitter_id", "project_id", "age_at_index", 
+          "age_is_obfuscated", "cause_of_death", "days_to_birth", "days_to_death",
+          "ethnicity", "gender", "race", "vital_status", "year_of_birth", "year_of_death",
+          "age_at_diagnosis", "ajcc_pathologic_m", "ajcc_pathologic_n", "ajcc_pathologic_stage",
+          "ajcc_pathologic_t", "ajcc_staging_system_edition", "classification_of_tumor", "cog_rhabdomyosarcoma_risk_group", 
+          "days_to_last_follow_up", "days_to_last_known_disease_status", "days_to_recurrence",
+          "icd_10_code", "irs_group", "last_known_disease_status", "laterality", 
+          "metastasis_at_diagnosis", "metastasis_at_diagnosis_site", "morphology", 
+          "primary_diagnosis", "prior_malignancy", "prior_treatment", "progression_or_recurrence", 
+          "residual_disease", "site_of_resection_or_biopsy", "synchronous_malignancy", 
+          "tissue_or_organ_of_origin", "tumor_confined_to_organ_of_origin", "tumor_focality", 
+          "tumor_grade", "year_of_diagnosis", "days_to_treatment_end", "days_to_treatment_start", 
+          "initial_disease_status", "regimen_or_line_of_therapy", "therapeutic_agents", 
+          "treatment_intent_type", "treatment_or_therapy", "treatment_outcome", "treatment_type")
+clinical <- clinical %>% select(keep)
+dim(clinical)
+View(clinical)
+
+# write counts_data to csv file #
+# replace file path with desired location on your machine # 
+clinical <- apply(clinical, 2, as.character)
+write_to <- 'FILE PATH HERE'
+write.csv(clinical, paste(write_to, "clinical_cleaned.csv"), row.names=FALSE)
+
+
